@@ -1,7 +1,7 @@
 BIRD_FOLDER_LOC = "S:\\Thesis_Storage\\Zephyr\\dataset\\bird"
 NOBIRD_FOLDER_LOC = "S:\\Thesis_Storage\\Zephyr\\dataset\\nobird"
 NOBIRDLIKELY_FOLDER_LOC = "S:\\Thesis_Storage\\Zephyr\\dataset\\nobirdlikely"
-NOBIRD_MATCHED_FOLDER_LOC = "S:\\Thesis_Storage\\Zephyr\\dataset\\nobird_matched"
+OUTPUT_FOLDER_LOC = "S:\\Thesis_Storage\\Zephyr\\dataset\\nobird_matched"
 
 GRAYSCALE_TEST_SUBIMAGE = 13
 
@@ -10,6 +10,7 @@ import numpy as np
 import os
 import matplotlib.image as mpimg
 import random
+import shutil
 
 def check_if_grayscale(filepath):
     '''
@@ -45,12 +46,12 @@ class CameraLocation:
         self.group = group
         self.min_image_index = 9999
         self.max_image_index = 0
-        self.is_grayscale = np.zeros((10000, 1), dtype=bool) # Maximum number of images per location
-        self.is_used = np.zeros((176,10000), dtype=bool) # Subimage index, image if used
-        self.is_nobirdlikely = np.zeros((10000, 1), dtype=bool)
-        self.is_bird = np.zeros((176, 10000), dtype=bool)
-        self.special_name = np.zeros((10000, 1), dtype=bool)
-        self.is_present = np.zeros((10000, 1), dtype=bool)
+        self.is_grayscale = np.zeros(10000, dtype=bool) # Maximum number of images per location
+        self.is_used = np.zeros((10000, 176), dtype=bool) # Subimage index, image if used
+        self.is_nobirdlikely = np.zeros(10000, dtype=bool)
+        self.is_bird = np.zeros((10000, 176), dtype=bool)
+        self.special_name = np.zeros(10000, dtype=bool)
+        self.is_present = np.zeros(10000, dtype=bool)
 
     ## Don't need this as this time - remove on a future commit
     # def to_dict(self):
@@ -103,13 +104,13 @@ class CameraLocation:
         self.is_grayscale[index] = 1
 
     def mark_subimage_used(self, image_index, subimage_index):
-        self.is_used[subimage_index, image_index] = 1
+        self.is_used[image_index, subimage_index] = 1
 
     def mark_nobirdlikely(self, image_index):
         self.is_nobirdlikely[image_index] = 1
 
     def mark_bird(self, image_index, subimage_index):
-        self.is_bird[subimage_index, image_index] = 1
+        self.is_bird[image_index, subimage_index] = 1
 
     def mark_special_name(self, image_index):
         self.special_name[image_index] = 1
@@ -121,13 +122,13 @@ class CameraLocation:
         return self.is_grayscale[index] == 1
     
     def get_used(self, image_index, subimage_index):
-        return self.is_used[subimage_index, image_index] == 1
+        return self.is_used[image_index, subimage_index] == 1
 
     def get_nobirdlikely(self, image_index):
         return self.is_nobirdlikely[image_index] == 1
 
     def get_bird(self, image_index, subimage_index):
-        return self.is_bird[subimage_index, image_index] == 1
+        return self.is_bird[image_index, subimage_index] == 1
 
     def get_special_name(self, image_index):
         return self.is_special_name[image_index] == 1
@@ -176,15 +177,23 @@ class CameraLocation:
             if check_if_grayscale(filepath):
                 self.is_grayscale[image_index_n] = 1
 
-    def generate_unused_file_name(self, subimage_index):
+    def generate_unused_filepath(self, subimage_index):
+        '''
+        returns the source folder location and file name in a tuple
+        '''
         incrementing_numbers = np.array(range(0, self.is_grayscale.size))
-        valid_indicies = \
+        valid_locations = \
             ~self.is_grayscale & \
             self.is_present & \
-            ~self.is_used[subimage_index, :]
+            ~self.is_used[:, subimage_index]
+        if np.sum(valid_locations) == 0:
+            print(f'No valid indicies!')
+            return ""
+        valid_indicies = incrementing_numbers[valid_locations]
+        image_index = valid_indicies[random.randint(0, valid_indicies.size-1)]
         filename = self.generate_filename(image_index, subimage_index)
         self.mark_subimage_used(image_index, subimage_index)
-        return filename
+        return (self.where_located(image_index, subimage_index), filename)
 
     
 class CameraLocationArray:
@@ -220,34 +229,41 @@ for filename in os.scandir(BIRD_FOLDER_LOC):
     else:
         camera.add_subimage_info("BIRD", image_index, subimage_index)
 
-for filename in os.scandir(NOBIRD_FOLDER_LOC):
-    match_obj = re.match(regex_string, filename.name)
-    (number, date, group, image_index, spec_char, subimage_index) = match_obj.groups()
-    camera = CLA.get_camera(number, date, group)
-    if spec_char != " b":
-        camera.mark_special_name(int(image_index))
-    else:
-        camera.add_subimage_info("NOBIRD", image_index, subimage_index)
-
-## Commenting this out because it's the largest folder and takes a while
-# for filename in os.scandir(NOBIRDLIKELY_FOLDER_LOC):
+# for filename in os.scandir(NOBIRD_FOLDER_LOC):
 #     match_obj = re.match(regex_string, filename.name)
 #     (number, date, group, image_index, spec_char, subimage_index) = match_obj.groups()
 #     camera = CLA.get_camera(number, date, group)
-#     if spec_char != "":
+#     if spec_char != " b":
 #         camera.mark_special_name(int(image_index))
 #     else:
-#         camera.add_subimage_info("NOBIRDLIKELY", image_index, subimage_index)
+#         camera.add_subimage_info("NOBIRD", image_index, subimage_index)
+
+for filename in os.scandir(NOBIRDLIKELY_FOLDER_LOC):
+    match_obj = re.match(regex_string, filename.name)
+    (number, date, group, image_index, spec_char, subimage_index) = match_obj.groups()
+    camera = CLA.get_camera(number, date, group)
+    if spec_char != "":
+        camera.mark_special_name(int(image_index))
+    else:
+        camera.add_subimage_info("NOBIRDLIKELY", image_index, subimage_index)
 
 # Omit the first one since it's just zeros
 if CLA.cameras[0].date == 0:
     CLA.cameras = CLA.cameras[1:]
 
-# Iterate through the bird files and find an equal number of no-bird files
+# Iterate through the bird files and find matching no-bird files.
+NOBIRD_FILE_MULTIPLIER = 5
+
 for filename in os.scandir(BIRD_FOLDER_LOC):
     match_obj = re.match(regex_string, filename.name)
     (number, date, group, image_index, spec_char, subimage_index) = match_obj.groups()
     camera = CLA.get_camera(number, date, group)
+    for i in range(0, NOBIRD_FILE_MULTIPLIER):
+        (src_folder, src_name) = camera.generate_unused_filepath(int(subimage_index))
+        src = os.path.join(src_folder, src_name)
+        dest = os.path.join(OUTPUT_FOLDER_LOC, src_name)
+        shutil.copy2(src, dest)
+    break
     
 print("Number of files for each camera location")
 for camera in CLA.cameras:
