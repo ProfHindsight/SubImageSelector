@@ -231,8 +231,6 @@ def generate_metadata():
 
     return CLA
 
-
-
 # -------------------------------------------------------
 #           GENERATE THE MATCHED DATASET
 # -------------------------------------------------------
@@ -253,6 +251,37 @@ def generate_matched_dataset(CLA, exclude_nobird_data=True):
 
     print("Matched Dataset Generated")
 
+
+# -------------------------------------------------------
+#           SPLIT MATCHED DATASET
+# -------------------------------------------------------
+DATASET_FOLDER_LOC = "S:\\Thesis_Storage\\Zephyr\\mini-dataset-matched"
+def split_matched_dataset(train_percent):
+    if train_percent > 1 or train_percent < 0:
+        print("Please provide a floating point number bewteen 0 and 1")
+        return
+
+    # Split the bird dataset
+    for filename in os.scandir(BIRD_FOLDER_LOC):
+        src = os.path.join(BIRD_FOLDER_LOC, filename.name)
+        if random.random() < train_percent:
+            dest = os.path.join(DATASET_FOLDER_LOC, "train\\bird")
+            shutil.copy2(src, dest)
+        else:
+            dest = os.path.join(DATASET_FOLDER_LOC, "val\\bird")
+            shutil.copy2(src, dest)
+
+    # Split the no-bird dataset
+    for filename in os.scandir(OUTPUT_FOLDER_LOC):
+        src = os.path.join(OUTPUT_FOLDER_LOC, filename.name)
+        if random.random() < train_percent:
+            dest = os.path.join(DATASET_FOLDER_LOC, "train\\nobird")
+            shutil.copy2(src, dest)
+        else:
+            dest = os.path.join(DATASET_FOLDER_LOC, "val\\nobird")
+            shutil.copy2(src, dest)
+
 if __name__ == "__main__":
-    CLA = generate_metadata()
-    generate_matched_dataset(CLA, exclude_nobird_data=(TEST!=1))
+    # CLA = generate_metadata()
+    # generate_matched_dataset(CLA, exclude_nobird_data=(TEST!=1))
+    split_matched_dataset(0.8)
