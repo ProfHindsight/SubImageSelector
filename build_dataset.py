@@ -229,6 +229,7 @@ for filename in os.scandir(BIRD_FOLDER_LOC):
     else:
         camera.add_subimage_info("BIRD", image_index, subimage_index)
 
+# Commenting this out to not use bird images. The first sample images had birds in them when they shouldn't have.
 # for filename in os.scandir(NOBIRD_FOLDER_LOC):
 #     match_obj = re.match(regex_string, filename.name)
 #     (number, date, group, image_index, spec_char, subimage_index) = match_obj.groups()
