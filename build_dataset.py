@@ -40,20 +40,21 @@ class CameraLocation:
     - NOTE: Numpy array axes should be divisible by 8 so we can pack them into the byte array 
             without having to do anything special
     '''
-    def __init__(self, number, date, group):
+    def __init__(self, number, date, group, special_chars):
         self.number = number
         self.date = date
         self.group = group
+        self.special_chars = special_chars
         self.min_image_index = 9999
         self.max_image_index = 0
         self.is_grayscale = np.zeros(10000, dtype=bool) # Maximum number of images per location
         self.is_used = np.zeros((10000, 176), dtype=bool) # Subimage index, image if used
         self.is_nobirdlikely = np.zeros(10000, dtype=bool)
         self.is_bird = np.zeros((10000, 176), dtype=bool)
-        self.special_name = np.zeros(10000, dtype=bool)
+        self.is_special_name = np.zeros(10000, dtype=bool)
         self.is_present = np.zeros(10000, dtype=bool)
 
-    ## Don't need this as this time - remove on a future commit
+    ## This is if we want to try pack it in some Python storage item and unpack later
     # def to_dict(self):
     #     camdict = {
     #         "number"                : self.number,
@@ -113,10 +114,13 @@ class CameraLocation:
         self.is_bird[image_index, subimage_index] = 1
 
     def mark_special_name(self, image_index):
-        self.special_name[image_index] = 1
+        self.is_special_name[image_index] = 1
 
     def mark_is_present(self, image_index):
         self.is_present[image_index] = 1
+
+    def set_special_chars(self, special_chars):
+        self.special_chars = special_chars
 
     def get_grayscale(self, index):
         return self.is_grayscale[index] == 1
@@ -130,11 +134,14 @@ class CameraLocation:
     def get_bird(self, image_index, subimage_index):
         return self.is_bird[image_index, subimage_index] == 1
 
-    def get_special_name(self, image_index):
+    def get_is_special_name(self, image_index):
         return self.is_special_name[image_index] == 1
     
     def get_present(self, image_index):
         return self.is_present[image_index] == 1
+    
+    def get_special_chars(self, special_chars):
+        return self.special_chars
 
     def where_located(self, image_index, subimage_index):
         if self.get_bird(image_index, subimage_index):
@@ -198,24 +205,30 @@ class CameraLocation:
     
 class CameraLocationArray:
     def __init__(self):
-        self.cameras = [CameraLocation(0,0,0)]
+        self.cameras = [CameraLocation(0,0,0,0)]
         self.last_index = 0
         self.first_time = True
     
     def add_camera(self, camera):
         self.cameras.append(camera)
 
-    def get_camera(self, number, date, group):
+    def get_camera(self, number, date, group, special_chars):
         if self.cameras[self.last_index].match(number, date, group):
             return self.cameras[self.last_index]
         else:
             for camera in self.cameras:
                 if camera.match(number, date, group):
                     return camera
-            self.add_camera(CameraLocation(number, date, group))
+            self.add_camera(CameraLocation(number, date, group, spec_char))
             return self.cameras[-1]
 
+TEST = 0
+
 CLA = CameraLocationArray()
+
+# -------------------------------------------------------
+#           GATHER THE DATA
+# -------------------------------------------------------
 
 # Camera, Date, Group, Image Index, Special Characters, Subimage Index
 regex_string = r'Camera ([0-6])_([0-9A-Za-z -.]*)_([0-3]*)RECNX_IMG_([0-9]*)([ a-zA-Z_]*)_([0-9]*).png'
@@ -223,47 +236,52 @@ regex_string = r'Camera ([0-6])_([0-9A-Za-z -.]*)_([0-3]*)RECNX_IMG_([0-9]*)([ a
 for filename in os.scandir(BIRD_FOLDER_LOC):
     match_obj = re.match(regex_string, filename.name)
     (number, date, group, image_index, spec_char, subimage_index) = match_obj.groups()
-    camera = CLA.get_camera(number, date, group)
+    camera = CLA.get_camera(number, date, group, spec_char)
     if spec_char != " b":
         camera.mark_special_name(int(image_index))
     else:
         camera.add_subimage_info("BIRD", image_index, subimage_index)
 
-# Commenting this out to not use bird images. The first sample images had birds in them when they shouldn't have.
-# for filename in os.scandir(NOBIRD_FOLDER_LOC):
-#     match_obj = re.match(regex_string, filename.name)
-#     (number, date, group, image_index, spec_char, subimage_index) = match_obj.groups()
-#     camera = CLA.get_camera(number, date, group)
-#     if spec_char != " b":
-#         camera.mark_special_name(int(image_index))
-#     else:
-#         camera.add_subimage_info("NOBIRD", image_index, subimage_index)
-
-for filename in os.scandir(NOBIRDLIKELY_FOLDER_LOC):
-    match_obj = re.match(regex_string, filename.name)
-    (number, date, group, image_index, spec_char, subimage_index) = match_obj.groups()
-    camera = CLA.get_camera(number, date, group)
-    if spec_char != "":
-        camera.mark_special_name(int(image_index))
-    else:
-        camera.add_subimage_info("NOBIRDLIKELY", image_index, subimage_index)
+if TEST == 1:
+    for filename in os.scandir(NOBIRD_FOLDER_LOC):
+        match_obj = re.match(regex_string, filename.name)
+        (number, date, group, image_index, spec_char, subimage_index) = match_obj.groups()
+        camera = CLA.get_camera(number, date, group, spec_char)
+        if spec_char != " b":
+            camera.mark_special_name(int(image_index))
+        else:
+            camera.add_subimage_info("NOBIRD", image_index, subimage_index)
+else:
+    for filename in os.scandir(NOBIRDLIKELY_FOLDER_LOC):
+        match_obj = re.match(regex_string, filename.name)
+        (number, date, group, image_index, spec_char, subimage_index) = match_obj.groups()
+        camera = CLA.get_camera(number, date, group, spec_char)
+        if spec_char != "":
+            camera.mark_special_name(int(image_index))
+        else:
+            camera.add_subimage_info("NOBIRDLIKELY", image_index, subimage_index)
 
 # Omit the first one since it's just zeros
 if CLA.cameras[0].date == 0:
     CLA.cameras = CLA.cameras[1:]
 
-# Iterate through the bird files and find matching no-bird files.
+# -------------------------------------------------------
+#           GENERATE THE MATCHED DATASET
+# -------------------------------------------------------
 NOBIRD_FILE_MULTIPLIER = 5
 
 for filename in os.scandir(BIRD_FOLDER_LOC):
     match_obj = re.match(regex_string, filename.name)
     (number, date, group, image_index, spec_char, subimage_index) = match_obj.groups()
-    camera = CLA.get_camera(number, date, group)
+    camera = CLA.get_camera(number, date, group, spec_char)
     for i in range(0, NOBIRD_FILE_MULTIPLIER):
         (src_folder, src_name) = camera.generate_unused_filepath(int(subimage_index))
         src = os.path.join(src_folder, src_name)
         dest = os.path.join(OUTPUT_FOLDER_LOC, src_name)
         shutil.copy2(src, dest)
+
+    if TEST == 1:
+        break
     
 print("Number of files for each camera location")
 for camera in CLA.cameras:
