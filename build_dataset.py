@@ -54,53 +54,6 @@ class CameraLocation:
         self.is_special_name = np.zeros(10000, dtype=bool)
         self.is_present = np.zeros(10000, dtype=bool)
 
-    ## This is if we want to try pack it in some Python storage item and unpack later
-    # def to_dict(self):
-    #     camdict = {
-    #         "number"                : self.number,
-    #         "date"                  : self.date,
-    #         "group"                 : self.group,
-    #         "min_index"             : self.min_image_index,
-    #         "max_index"             : self.max_image_index,
-    #         "grayscale"             : np.packbits(self.is_grayscale).tobytes(),
-    #         "is_used"               : np.packbits(self.is_used).tobytes(),
-    #         "is_nobirdlikely"       : np.packbits(self.is_nobirdlikely).tobytes(),
-    #         "is_bird"               : np.packbits(self.is_bird).tobytes(),
-    #         "special_name"          : np.packbits(self.special_name).tobytes(),
-    #         "is_present"            : np.packbits(self.is_present).tobytes(),
-    #         "grayscale_rows"        : self.is_grayscale.shape[0],
-    #         "grayscale_cols"        : self.is_grayscale.shape[1],
-    #         "is_used_rows"          : self.is_used.shape[0],
-    #         "is_used_cols"          : self.is_used.shape[1],
-    #         "is_nobirdlikely_rows"  : self.is_nobirdlikely.shape[0],
-    #         "is_nobirdlikely_cols"  : self.is_nobirdlikely.shape[1],
-    #         "is_bird_rows"          : self.is_bird.shape[0],
-    #         "is_bird_cols"          : self.is_bird.shape[1],
-    #         "special_name_rows"     : self.special_name.shape[0],
-    #         "special_name_cols"     : self.special_name.shape[1],
-    #         "is_present_rows"       : self.is_present.shape[0],
-    #         "is_present_cols"       : self.is_present.shape[1] 
-    #     }
-    #     return camdict
-    
-    # def load_from_dict(self, camdict):
-    #     def unpack_byte_array(bytear, rows, cols):
-    #         array = np.frombuffer(bytear, dtype=np.uint8)
-    #         array = np.unpackbits(array)
-    #         array = np.reshape(array, (int(rows), int(cols)))
-    #         return np.array(array, dtype=bool)
-    #     self.number                 = camdict["number"]
-    #     self.date                   = camdict["date"]
-    #     self.group                  = camdict["group"]
-    #     self.min_image_index        = camdict["min_index"]
-    #     self.max_image_index        = camdict["max_index"]
-    #     self.grayscale              = unpack_byte_array(camdict["grayscale"], camdict["grayscale_rows"], camdict["grayscale_cols"])
-    #     self.is_used                = unpack_byte_array(camdict["is_used"], camdict["is_used_rows"], camdict["is_used_cols"])
-    #     self.is_nobirdlikely        = unpack_byte_array(camdict["is_nobirdlikely"], camdict["is_nobirdlikely_rows"], camdict["is_nobirdlikely_cols"])
-    #     self.is_bird                = unpack_byte_array(camdict["is_bird"], camdict["is_bird_rows"], camdict["is_bird_cols"])
-    #     self.special_name           = unpack_byte_array(camdict["special_name"], camdict["special_name_rows"], camdict["special_name_cols"])
-    #     self.is_present             = unpack_byte_array(camdict["is_present"], camdict["is_present_rows"], camdict["is_present_cols"])
-
     def mark_grayscale(self, index):
         self.is_grayscale[index] = 1
 
