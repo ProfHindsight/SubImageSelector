@@ -264,7 +264,6 @@ for filename in os.scandir(BIRD_FOLDER_LOC):
         src = os.path.join(src_folder, src_name)
         dest = os.path.join(OUTPUT_FOLDER_LOC, src_name)
         shutil.copy2(src, dest)
-    break
     
 print("Number of files for each camera location")
 for camera in CLA.cameras:
