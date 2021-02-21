@@ -1,0 +1,3 @@
+[submodule "image-driver"]
+	path = image-driver
+	url = https://github.com/bryanhuhta/image-driver.git
