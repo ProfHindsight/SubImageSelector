@@ -238,9 +238,9 @@ NOBIRD_FILE_MULTIPLIER = 5
 def generate_matched_dataset(CLA, exclude_nobird_data=True):
     for filename in os.scandir(BIRD_FOLDER_LOC):
         match_obj = re.match(regex_string, filename.name)
-        (number, date, group, image_index, spec_char, subimage_index) = match_obj.groups()
+        (number, date, group, _, spec_char, subimage_index) = match_obj.groups()
         camera = CLA.get_camera(number, date, group, spec_char)
-        for i in range(0, NOBIRD_FILE_MULTIPLIER):
+        for _ in range(0, NOBIRD_FILE_MULTIPLIER):
             (src_folder, src_name) = camera.generate_unused_filepath(int(subimage_index), exclude_nobird_data)
             src = os.path.join(src_folder, src_name)
             dest = os.path.join(OUTPUT_FOLDER_LOC, src_name)
@@ -265,21 +265,22 @@ def split_matched_dataset(train_percent):
     for filename in os.scandir(BIRD_FOLDER_LOC):
         src = os.path.join(BIRD_FOLDER_LOC, filename.name)
         if random.random() < train_percent:
-            dest = os.path.join(DATASET_FOLDER_LOC, "train\\bird")
+            dest = os.path.join(DATASET_FOLDER_LOC, "train\\bird\\")
             shutil.copy2(src, dest)
         else:
-            dest = os.path.join(DATASET_FOLDER_LOC, "val\\bird")
+            dest = os.path.join(DATASET_FOLDER_LOC, "val\\bird\\")
             shutil.copy2(src, dest)
 
     # Split the no-bird dataset
     for filename in os.scandir(OUTPUT_FOLDER_LOC):
         src = os.path.join(OUTPUT_FOLDER_LOC, filename.name)
         if random.random() < train_percent:
-            dest = os.path.join(DATASET_FOLDER_LOC, "train\\nobird")
+            dest = os.path.join(DATASET_FOLDER_LOC, "train\\nobird\\")
             shutil.copy2(src, dest)
         else:
-            dest = os.path.join(DATASET_FOLDER_LOC, "val\\nobird")
+            dest = os.path.join(DATASET_FOLDER_LOC, "val\\nobird\\")
             shutil.copy2(src, dest)
+
 
 if __name__ == "__main__":
     # CLA = generate_metadata()
