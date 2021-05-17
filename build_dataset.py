@@ -1,3 +1,12 @@
+'''
+
+OK, so what we're doing here is scanning through all of the "BIRD" files, extracting the sub-image index from the filename,
+and copying X number of "NOBIRD" files into the output location.
+
+All "BIRD" files will be used. 
+
+'''
+
 BIRD_FOLDER_LOC = "S:\\Thesis_Storage\\Zephyr\\dataset\\bird"
 NOBIRD_FOLDER_LOC = "S:\\Thesis_Storage\\Zephyr\\dataset\\nobird"
 NOBIRDLIKELY_FOLDER_LOC = "S:\\Thesis_Storage\\Zephyr\\dataset\\nobirdlikely"
@@ -53,6 +62,7 @@ class CameraLocation:
         self.is_bird = np.zeros((10000, 176), dtype=bool)
         self.is_special_name = np.zeros(10000, dtype=bool)
         self.is_present = np.zeros(10000, dtype=bool)
+        self.training_data = np.zeros(10000, dtype=bool)
 
     def mark_grayscale(self, index):
         self.is_grayscale[index] = 1
@@ -71,6 +81,9 @@ class CameraLocation:
 
     def mark_is_present(self, image_index):
         self.is_present[image_index] = 1
+
+    def mark_subimage_for_training(self, image_index):
+        self.training_data[image_index] = 1
 
     def set_special_chars(self, special_chars):
         self.special_chars = special_chars
@@ -116,10 +129,18 @@ class CameraLocation:
         return self.number == number and self.date == date and self.group == group
 
     def generate_filename(self, image_index, subimage_index):
+        # Camera 1_2. 5 Oct - 28 Oct 2016_100RECNX_IMG_0927 b_052
         if self.get_nobirdlikely(image_index):
             return f'Camera {self.number}_{self.date}_{self.group}RECNX_IMG_{image_index:04}_{subimage_index:03}.png'
         else:
             return f'Camera {self.number}_{self.date}_{self.group}RECNX_IMG_{image_index:04} b_{subimage_index:03}.png'
+        
+    def generate_source_image_filepath(self, image_index):
+        # Camera 1/1. 28 Sept - 5 Oct 2016/100RECNX/IMG_0055.JPG
+        if self.get_nobirdlikely(image_index):
+            return f'Camera {self.number}/{self.date}/{self.group}RECNX/IMG{image_index:04}.JPG'
+        else:
+            return f'Camera {self.number}/{self.date}/{self.group}RECNX/IMG{image_index:04} b.JPG'
 
     def add_subimage_info(self, source, image_index, subimage_index):
         image_index_n = int(image_index)
@@ -130,6 +151,7 @@ class CameraLocation:
         if source == "BIRD":
             self.mark_bird(image_index_n, subimage_index_n)
             self.mark_subimage_used(image_index_n, subimage_index_n)
+            self.mark_subimage_for_training(image_index_n)
         elif source == "NOBIRDLIKELY":
             self.mark_nobirdlikely(image_index_n)
         if subimage_index_n == GRAYSCALE_TEST_SUBIMAGE:
@@ -137,17 +159,39 @@ class CameraLocation:
             if check_if_grayscale(filepath):
                 self.is_grayscale[image_index_n] = 1
 
-    def generate_unused_filepath(self, subimage_index, exclude_nobird_data):
+    def generate_unused_nobird_filepath(self, subimage_index, only_nobirdlikely_data):
         '''
         returns the source folder location and file name in a tuple
+        subimage_index - the subimage we are targeting
+        only_nobirdlikely_data - If True, only uses nobird_likely
+                                 If False, uses both nobird_likely and nobird
         '''
         incrementing_numbers = np.array(range(0, self.is_grayscale.size))
+        
+        '''
+        1. Making sure the sub-image isn't grayscale
+        2. Making sure the image file is actually present
+        3. Making sure the sub-image hasn't already been selected for use
+        '''
         valid_locations = \
             ~self.is_grayscale & \
             self.is_present & \
             ~self.is_used[:, subimage_index]
+        
+        '''
+        This is an addition (which probably warrants a re-write) to minimize the number of "nobird"
+        images used for training. The purpose of this is to use as few files as possible for training
+        so the rest can be used in the overall dataset evaluation after the network is trained.
+        '''
+        if (np.sum(valid_locations & self.training_data) == 0):
+            unused_locations = valid_locations & ~self.training_data
+            unused_indicies = incrementing_numbers[unused_locations]
+            unused_index = unused_indicies[random.randint(0, unused_indicies.size-1)]
+            self.mark_subimage_for_training(unused_index)
+        
+        valid_locations = valid_locations & self.training_data
 
-        if exclude_nobird_data == True:
+        if only_nobirdlikely_data == True:
             valid_locations = valid_locations & self.is_nobirdlikely
 
         if np.sum(valid_locations) == 0:
@@ -235,19 +279,27 @@ def generate_metadata():
 #           GENERATE THE MATCHED DATASET
 # -------------------------------------------------------
 NOBIRD_FILE_MULTIPLIER = 5
-def generate_matched_dataset(CLA, exclude_nobird_data=True):
+def generate_matched_dataset(CLA, only_nobirdlikely_data=True):
     for filename in os.scandir(BIRD_FOLDER_LOC):
         match_obj = re.match(regex_string, filename.name)
         (number, date, group, _, spec_char, subimage_index) = match_obj.groups()
         camera = CLA.get_camera(number, date, group, spec_char)
         for _ in range(0, NOBIRD_FILE_MULTIPLIER):
-            (src_folder, src_name) = camera.generate_unused_filepath(int(subimage_index), exclude_nobird_data)
+            (src_folder, src_name) = camera.generate_unused_nobird_filepath(int(subimage_index), only_nobirdlikely_data)
             src = os.path.join(src_folder, src_name)
             dest = os.path.join(OUTPUT_FOLDER_LOC, src_name)
             shutil.copy2(src, dest)
 
         if TEST == 1:
             break
+    
+    output_image_used_csv = os.path.join(OUTPUT_FOLDER_LOC, "used_images.csv")
+    with open(output_image_used_csv, 'w') as csv_file:
+        csv_file.write("Filename\n")
+        for camera in CLA.cameras:
+            for i in range(0, len(camera.is_grayscale)):
+                if camera.training_data[i] == True:
+                    csv_file.write(camera.generate_source_image_filepath() + "\n")
 
     print("Matched Dataset Generated")
 
@@ -283,6 +335,18 @@ def split_matched_dataset(train_percent):
 
 
 if __name__ == "__main__":
-    # CLA = generate_metadata()
-    # generate_matched_dataset(CLA, exclude_nobird_data=(TEST!=1))
+    if not os.path.exists(OUTPUT_FOLDER_LOC):
+        os.mkdir(OUTPUT_FOLDER_LOC)
+
+    if not os.path.exists(DATASET_FOLDER_LOC):
+        os.mkdir(DATASET_FOLDER_LOC)
+        os.mkdir(os.path.join(DATASET_FOLDER_LOC, "train"))
+        os.mkdir(os.path.join(DATASET_FOLDER_LOC, "train\\bird"))
+        os.mkdir(os.path.join(DATASET_FOLDER_LOC, "train\\nobird"))
+        os.mkdir(os.path.join(DATASET_FOLDER_LOC, "val"))
+        os.mkdir(os.path.join(DATASET_FOLDER_LOC, "val\\bird"))
+        os.mkdir(os.path.join(DATASET_FOLDER_LOC, "val\\nobird"))
+        
+    CLA = generate_metadata()
+    generate_matched_dataset(CLA, only_nobirdlikely_data=(TEST!=1))
     split_matched_dataset(0.8)
