@@ -159,12 +159,10 @@ class CameraLocation:
             if check_if_grayscale(filepath):
                 self.is_grayscale[image_index_n] = 1
 
-    def generate_unused_nobird_filepath(self, subimage_index, only_nobirdlikely_data):
+    def generate_unused_nobird_filepath(self, subimage_index):
         '''
         returns the source folder location and file name in a tuple
         subimage_index - the subimage we are targeting
-        only_nobirdlikely_data - If True, only uses nobird_likely
-                                 If False, uses both nobird_likely and nobird
         '''
         incrementing_numbers = np.array(range(0, self.is_grayscale.size))
         
@@ -190,9 +188,6 @@ class CameraLocation:
             self.mark_subimage_for_training(unused_index)
         
         valid_locations = valid_locations & self.training_data
-
-        if only_nobirdlikely_data == True:
-            valid_locations = valid_locations & self.is_nobirdlikely
 
         if np.sum(valid_locations) == 0:
             print(f'No valid indicies!')
@@ -225,7 +220,7 @@ class CameraLocationArray:
 
 
 # OPERATIONAL VARIABLES or something
-TEST = 0
+TEST = 1
 # Camera, Date, Group, Image Index, Special Characters, Subimage Index
 regex_string = r'Camera ([0-6])_([0-9A-Za-z -.]*)_([0-3]*)RECNX_IMG_([0-9]*)([ a-zA-Z_]*)_([0-9]*).png'
 
@@ -279,13 +274,13 @@ def generate_metadata():
 #           GENERATE THE MATCHED DATASET
 # -------------------------------------------------------
 NOBIRD_FILE_MULTIPLIER = 5
-def generate_matched_dataset(CLA, only_nobirdlikely_data=True):
+def generate_matched_dataset(CLA):
     for filename in os.scandir(BIRD_FOLDER_LOC):
         match_obj = re.match(regex_string, filename.name)
         (number, date, group, _, spec_char, subimage_index) = match_obj.groups()
         camera = CLA.get_camera(number, date, group, spec_char)
         for _ in range(0, NOBIRD_FILE_MULTIPLIER):
-            (src_folder, src_name) = camera.generate_unused_nobird_filepath(int(subimage_index), only_nobirdlikely_data)
+            (src_folder, src_name) = camera.generate_unused_nobird_filepath(int(subimage_index))
             src = os.path.join(src_folder, src_name)
             dest = os.path.join(OUTPUT_FOLDER_LOC, src_name)
             shutil.copy2(src, dest)
@@ -299,7 +294,7 @@ def generate_matched_dataset(CLA, only_nobirdlikely_data=True):
         for camera in CLA.cameras:
             for i in range(0, len(camera.is_grayscale)):
                 if camera.training_data[i] == True:
-                    csv_file.write(camera.generate_source_image_filepath() + "\n")
+                    csv_file.write(camera.generate_source_image_filepath(i) + "\n")
 
     print("Matched Dataset Generated")
 
@@ -348,5 +343,5 @@ if __name__ == "__main__":
         os.mkdir(os.path.join(DATASET_FOLDER_LOC, "val\\nobird"))
         
     CLA = generate_metadata()
-    generate_matched_dataset(CLA, only_nobirdlikely_data=(TEST!=1))
+    generate_matched_dataset(CLA)
     split_matched_dataset(0.8)
